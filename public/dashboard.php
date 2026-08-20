@@ -1,0 +1,14 @@
+<?php require_once __DIR__.'/../config.php'; $u=require_login();
+if ($u['role']==='admin') {
+  $pdo=db(); $drivers=(int)$pdo->query("SELECT COUNT(*) FROM users WHERE role='driver' AND active=1")->fetchColumn(); $lines=(int)$pdo->query('SELECT COUNT(*) FROM lines WHERE active=1')->fetchColumn(); $schedules=(int)$pdo->query("SELECT COUNT(*) FROM schedules WHERE service_date >= date('now')")->fetchColumn(); $pending=(int)$pdo->query("SELECT COUNT(*) FROM schedules WHERE confirmed=0 AND service_date >= date('now')")->fetchColumn();
+  layout_start('Painel',$u); ?>
+  <div class="page-head"><div><h1>Painel administrativo</h1><p class="muted">Controlo da operação STCP Virtual.</p></div><a class="btn primary" href="schedules.php?action=new">+ Nova escala</a></div>
+  <div class="stats"><div><span>Motoristas ativos</span><b><?=$drivers?></b></div><div><span>Linhas ativas</span><b><?=$lines?></b></div><div><span>Escalas futuras</span><b><?=$schedules?></b></div><div><span>Por confirmar</span><b><?=$pending?></b></div></div>
+  <section class="card"><h2>Acesso rápido</h2><div class="quick"><a href="drivers.php">Gerir motoristas</a><a href="lines.php">Gerir linhas</a><a href="schedules.php">Gerir escalas</a></div></section>
+<?php } else {
+  $stmt=db()->prepare("SELECT s.*, l.code, l.name, l.origin, l.destination FROM schedules s JOIN lines l ON l.id=s.line_id WHERE s.driver_id=? ORDER BY s.service_date,s.start_time"); $stmt->execute([$u['id']]); $rows=$stmt->fetchAll();
+  layout_start('A minha chapa',$u); ?>
+  <div class="page-head"><div><h1>A minha chapa</h1><p class="muted">Só tens acesso às tuas próprias escalas.</p></div></div>
+  <?php if(!$rows): ?><div class="empty">Não tens escalas atribuídas.</div><?php endif; ?>
+  <div class="schedule-grid"><?php foreach($rows as $r): ?><article class="schedule-card"><div class="schedule-top"><div><span class="line-code">Linha <?=$r['code']?></span><h2><?=e($r['name'])?></h2><p><?=e($r['origin'])?> → <?=e($r['destination'])?></p></div><span class="status <?= $r['confirmed']?'ok':'pending'?>"><?= $r['confirmed']?'Confirmada':'Por confirmar'?></span></div><div class="schedule-meta"><div><small>Data</small><b><?=date('d/m/Y',strtotime($r['service_date']))?></b></div><div><small>Horário</small><b><?=e($r['start_time'])?> – <?=e($r['end_time'])?></b></div></div><?php if($r['notes']): ?><p class="notes"><?=e($r['notes'])?></p><?php endif; ?><?php if(!$r['confirmed']): ?><form method="post" action="confirm.php"><input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="id" value="<?=$r['id']?>"><button class="btn primary">✓ Confirmar escala</button></form><?php else: ?><div class="confirmed">✓ Confirmada <?=e($r['confirmed_at']??'')?></div><?php endif; ?></article><?php endforeach; ?></div>
+<?php } layout_end(); ?>
